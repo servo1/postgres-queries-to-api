@@ -1,0 +1,21 @@
+CREATE EVENT TRIGGER tr_notice_table_changes ON ddl command end EXECUTE PROCEDURE public.fn_ddl_trigger();
+CREATE OR REPLACE FUNCTION public.fn_ddl_trigger()
+  RETURNS event_trigger AS
+$BODY$
+DECLARE r RECORD;
+temp text;
+BEGIN
+	FOR r IN SELECT * FROM pg_event_trigger_ddl_commands() LOOP
+
+  if split_part(r.command_tag, ' ', 2) = 'TABLE' or split_part(r.command_tag, ' ', 2) = 'VIEW' then
+		 PERFORM pg_notify('ddlnotify', r.object_identity || ',' || r.command_tag  || ',' || 
+			r.object_type || ',' || r.schema_name || ',' || r.classid) ;
+		else
+		 PERFORM pg_notify('ddlnotify', r.schema_name || ',' || r.classid) ;
+			
+		end if;
+	END LOOP;
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
